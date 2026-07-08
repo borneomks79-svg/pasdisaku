@@ -1,22 +1,40 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import useSWR from 'swr';
 import { api } from '../../../lib/api';
 
 const fetcher = (url: string) => api.get(url).then((res) => res.data);
+
+function isSentToday(lastContactedAt: string | null) {
+  if (!lastContactedAt) return false;
+  const d = new Date(lastContactedAt);
+  const n = new Date();
+  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
 
 export default function WhatsappPage() {
   const { data: contacts, mutate: mutateContacts } = useSWR('/crm-whatsapp/contacts', fetcher);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [message, setMessage] = useState('');
+  const [jeda, setJeda] = useState(8);
   const [status, setStatus] = useState('');
-  const [sending, setSending] = useState(false);
-  const [mode, setMode] = useState<'manual' | 'api'>('manual');
-  const [queue, setQueue] = useState<any[] | null>(null); // antrian mode manual
-  const [queueIndex, setQueueIndex] = useState(0);
+
+  const [queue, setQueue] = useState<any[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [log, setLog] = useState<{ text: string; ok: boolean }[]>([]);
+  const [sentCount, setSentCount] = useState(0);
+  const [skipCount, setSkipCount] = useState(0);
+
+  const timerRef = useRef<any>(null);
+  const cdRef = useRef<any>(null);
+  const stoppedRef = useRef(false);
+  const pausedRef = useRef(false);
 
   async function handleAddContact(e: React.FormEvent) {
     e.preventDefault();
@@ -53,68 +71,111 @@ export default function WhatsappPage() {
   }
 
   function waLink(phoneNumber: string) {
-    return `https://wa.me/${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(broadcastMessage)}`;
+    return `https://wa.me/${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
   }
 
-  function startManualQueue() {
+  function addLog(text: string, ok: boolean) {
+    setLog((prev) => [{ text, ok }, ...prev]);
+  }
+
+  function startQueue() {
     if (selected.length === 0) {
       setStatus('Pilih minimal 1 kontak dulu.');
       return;
     }
-    if (!broadcastMessage.trim()) {
+    if (!message.trim()) {
       setStatus('Tulis pesan dulu.');
       return;
     }
     const targets = contacts.filter((c: any) => selected.includes(c.id));
     setQueue(targets);
-    setQueueIndex(0);
+    setIdx(0);
+    setSentCount(0);
+    setSkipCount(0);
+    setLog([]);
     setStatus('');
+    stoppedRef.current = false;
+    pausedRef.current = false;
+    setPaused(false);
+    setRunning(true);
+    processIndex(targets, 0);
   }
 
-  async function handleOpenAndNext() {
-    const current = queue![queueIndex];
-    window.open(waLink(current.phone), '_blank');
-    try {
-      await api.post(`/crm-whatsapp/contacts/${current.id}/mark-sent`, { message: broadcastMessage });
-    } catch {
-      // abaikan, tidak kritis
-    }
-    if (queueIndex + 1 < queue!.length) {
-      setQueueIndex(queueIndex + 1);
-    } else {
-      setStatus(`Selesai! ${queue!.length} kontak sudah diproses.`);
-      setQueue(null);
-      setQueueIndex(0);
-      mutateContacts();
-    }
-  }
-
-  function cancelQueue() {
-    setQueue(null);
-    setQueueIndex(0);
-  }
-
-  async function handleApiBroadcast(e: React.FormEvent) {
-    e.preventDefault();
-    if (selected.length === 0) {
-      setStatus('Pilih minimal 1 kontak dulu.');
+  async function processIndex(q: any[], i: number) {
+    if (stoppedRef.current) return;
+    if (i >= q.length) {
+      finishQueue();
       return;
     }
-    setSending(true);
-    setStatus('');
-    const targets = contacts.filter((c: any) => selected.includes(c.id));
-    let success = 0;
-    let failed = 0;
-    for (const c of targets) {
-      try {
-        await api.post('/crm-whatsapp/send', { phone: c.phone, message: broadcastMessage });
-        success++;
-      } catch {
-        failed++;
-      }
+    const contact = q[i];
+    setIdx(i);
+
+    if (isSentToday(contact.lastContactedAt)) {
+      addLog(`⛔ ${contact.name || contact.phone} — sudah dikirim hari ini`, false);
+      setSkipCount((s) => s + 1);
+      advance(q, i);
+      return;
     }
-    setSending(false);
-    setStatus(`Selesai: ${success} terkirim, ${failed} gagal.`);
+
+    window.open(waLink(contact.phone), '_blank');
+    try {
+      await api.post(`/crm-whatsapp/contacts/${contact.id}/mark-sent`, { message });
+    } catch {
+      // tidak kritis
+    }
+    addLog(`✅ ${contact.name || contact.phone}`, true);
+    setSentCount((s) => s + 1);
+    mutateContacts();
+    advance(q, i);
+  }
+
+  function advance(q: any[], i: number) {
+    const next = i + 1;
+    if (next >= q.length) {
+      setTimeout(finishQueue, 500);
+      return;
+    }
+    startCountdown(q, next);
+  }
+
+  function startCountdown(q: any[], nextIdx: number) {
+    let s = jeda;
+    setCountdown(s);
+    clearInterval(cdRef.current);
+    cdRef.current = setInterval(() => {
+      if (pausedRef.current) return;
+      s--;
+      setCountdown(s);
+      if (s <= 0) {
+        clearInterval(cdRef.current);
+        processIndex(q, nextIdx);
+      }
+    }, 1000);
+  }
+
+  function finishQueue() {
+    setRunning(false);
+    setStatus(`Selesai! ${sentCount} terkirim, ${skipCount} dilewati.`);
+    clearInterval(cdRef.current);
+    clearTimeout(timerRef.current);
+  }
+
+  function pauseQueue() {
+    pausedRef.current = true;
+    setPaused(true);
+  }
+
+  function resumeQueue() {
+    pausedRef.current = false;
+    setPaused(false);
+  }
+
+  function stopQueue() {
+    stoppedRef.current = true;
+    clearInterval(cdRef.current);
+    clearTimeout(timerRef.current);
+    setRunning(false);
+    setStatus(`Dihentikan. ${sentCount} terkirim, ${skipCount} dilewati.`);
   }
 
   return (
@@ -140,73 +201,83 @@ export default function WhatsappPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginBottom: 12 }}>Mode Pengiriman</h3>
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-          <button
-            className="btn"
-            style={{ background: mode === 'manual' ? '#16a34a' : '#9ca3af' }}
-            onClick={() => setMode('manual')}
-          >
-            Manual (buka WhatsApp)
-          </button>
-          <button
-            className="btn"
-            style={{ background: mode === 'api' ? '#16a34a' : '#9ca3af' }}
-            onClick={() => setMode('api')}
-          >
-            Otomatis (API)
-          </button>
-        </div>
-        <p style={{ color: '#6b7280', fontSize: 14 }}>
-          {mode === 'manual'
-            ? 'Mode Manual: pesan dikirim satu-satu lewat aplikasi WhatsApp, diproses berurutan.'
-            : 'Mode Otomatis: butuh WA_PHONE_NUMBER_ID & WA_ACCESS_TOKEN aktif di backend.'}
-        </p>
-      </div>
-
-      <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginBottom: 12 }}>
-          Pesan {selected.length > 0 && `(${selected.length} kontak dipilih)`}
+          Kirim Massal {selected.length > 0 && `(${selected.length} kontak dipilih)`}
         </h3>
 
-        {!queue && (
+        {!running && (
           <>
             <textarea
-              placeholder="Tulis pesan untuk kontak terpilih"
-              value={broadcastMessage}
-              onChange={(e) => setBroadcastMessage(e.target.value)}
+              placeholder="Tulis pesan untuk semua kontak terpilih"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
               style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', minHeight: 80, marginBottom: 10 }}
             />
-
-            {mode === 'api' && (
-              <button className="btn" onClick={handleApiBroadcast} disabled={sending}>
-                {sending ? 'Mengirim...' : `Kirim Otomatis ke ${selected.length} Kontak`}
-              </button>
-            )}
-
-            {mode === 'manual' && (
-              <button className="btn" onClick={startManualQueue}>
-                Mulai Kirim ({selected.length} Kontak)
-              </button>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <label style={{ fontSize: 14 }}>Jeda antar kirim (detik):</label>
+              <input
+                type="number"
+                value={jeda}
+                onChange={(e) => setJeda(Math.max(3, parseInt(e.target.value) || 8))}
+                style={{ width: 70 }}
+              />
+            </div>
+            <button className="btn" onClick={startQueue}>
+              Mulai Kirim ({selected.length} Kontak)
+            </button>
           </>
         )}
 
-        {queue && (
-          <div style={{ textAlign: 'center', padding: 20 }}>
-            <p style={{ color: '#6b7280', marginBottom: 8 }}>
-              Kontak {queueIndex + 1} dari {queue.length}
-            </p>
-            <h2 style={{ marginBottom: 20 }}>
-              {queue[queueIndex].name || queue[queueIndex].phone}
-            </h2>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button className="btn" onClick={handleOpenAndNext}>
-                Buka WhatsApp &amp; Lanjut
+        {running && queue.length > 0 && (
+          <div>
+            <div style={{ textAlign: 'center', padding: 20, background: '#f0fdf4', borderRadius: 10, marginBottom: 16 }}>
+              <p style={{ color: '#6b7280', marginBottom: 8 }}>
+                Kontak {idx + 1} dari {queue.length}
+              </p>
+              <h2 style={{ marginBottom: 12 }}>{queue[idx]?.name || queue[idx]?.phone}</h2>
+              {countdown > 0 && !paused && (
+                <>
+                  <p style={{ fontSize: 32, fontWeight: 700, color: '#16a34a', margin: '6px 0' }}>{countdown}s</p>
+                  <p style={{ fontSize: 13, color: '#6b7280' }}>Membuka WhatsApp berikutnya otomatis...</p>
+                </>
+              )}
+              {paused && <p style={{ fontSize: 20, color: '#d69e2e' }}>⏸ Dijeda</p>}
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ background: '#e5e7eb', borderRadius: 6, height: 8, overflow: 'hidden' }}>
+                <div
+                  style={{
+                    background: '#16a34a',
+                    height: 8,
+                    width: `${((idx + 1) / queue.length) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {!paused && (
+                <button className="btn" style={{ background: '#d69e2e' }} onClick={pauseQueue}>
+                  Jeda
+                </button>
+              )}
+              {paused && (
+                <button className="btn" onClick={resumeQueue}>
+                  Lanjutkan
+                </button>
+              )}
+              <button className="btn" style={{ background: '#dc2626' }} onClick={stopQueue}>
+                Hentikan
               </button>
-              <button className="btn" style={{ background: '#9ca3af' }} onClick={cancelQueue}>
-                Batalkan
-              </button>
+            </div>
+
+            <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+              {log.map((l, i) => (
+                <p key={i} style={{ fontSize: 13, color: l.ok ? '#16a34a' : '#9ca3af', marginBottom: 4 }}>
+                  {l.text}
+                </p>
+              ))}
             </div>
           </div>
         )}
@@ -242,7 +313,12 @@ export default function WhatsappPage() {
                   </td>
                   <td>{c.name || '-'}</td>
                   <td>{c.phone}</td>
-                  <td>{c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleString('id-ID') : '-'}</td>
+                  <td>
+                    {c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleString('id-ID') : '-'}
+                    {isSentToday(c.lastContactedAt) && (
+                      <span style={{ color: '#16a34a', fontSize: 12, marginLeft: 6 }}>✓ hari ini</span>
+                    )}
+                  </td>
                   <td>
                     <button className="btn" style={{ background: '#dc2626' }} onClick={() => handleDeleteContact(c.id)}>
                       Hapus
