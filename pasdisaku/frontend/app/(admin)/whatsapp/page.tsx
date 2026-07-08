@@ -14,6 +14,7 @@ export default function WhatsappPage() {
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [status, setStatus] = useState('');
   const [sending, setSending] = useState(false);
+  const [mode, setMode] = useState<'manual' | 'api'>('manual');
 
   async function handleAddContact(e: React.FormEvent) {
     e.preventDefault();
@@ -35,7 +36,6 @@ export default function WhatsappPage() {
       await api.delete(`/crm-whatsapp/contacts/${id}`);
       mutateContacts();
       setSelected((prev) => prev.filter((s) => s !== id));
-      setStatus('Kontak dihapus.');
     } catch (err: any) {
       setStatus('Gagal hapus: ' + (err?.response?.data?.message || err.message));
     }
@@ -47,14 +47,23 @@ export default function WhatsappPage() {
 
   function toggleSelectAll() {
     if (!contacts) return;
-    if (selected.length === contacts.length) {
-      setSelected([]);
-    } else {
-      setSelected(contacts.map((c: any) => c.id));
+    setSelected(selected.length === contacts.length ? [] : contacts.map((c: any) => c.id));
+  }
+
+  function waLink(phone: string) {
+    return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(broadcastMessage)}`;
+  }
+
+  async function handleMarkSent(id: string) {
+    try {
+      await api.post(`/crm-whatsapp/contacts/${id}/mark-sent`, { message: broadcastMessage });
+      mutateContacts();
+    } catch {
+      // abaikan, tidak kritis
     }
   }
 
-  async function handleBroadcast(e: React.FormEvent) {
+  async function handleApiBroadcast(e: React.FormEvent) {
     e.preventDefault();
     if (selected.length === 0) {
       setStatus('Pilih minimal 1 kontak dulu.');
@@ -65,7 +74,6 @@ export default function WhatsappPage() {
     const targets = contacts.filter((c: any) => selected.includes(c.id));
     let success = 0;
     let failed = 0;
-
     for (const c of targets) {
       try {
         await api.post('/crm-whatsapp/send', { phone: c.phone, message: broadcastMessage });
@@ -74,11 +82,11 @@ export default function WhatsappPage() {
         failed++;
       }
     }
-
     setSending(false);
-    setStatus(`Selesai: ${success} terkirim, ${failed} gagal, dari ${targets.length} kontak terpilih.`);
-    setBroadcastMessage('');
+    setStatus(`Selesai: ${success} terkirim, ${failed} gagal.`);
   }
+
+  const selectedContacts = contacts ? contacts.filter((c: any) => selected.includes(c.id)) : [];
 
   return (
     <div className="container">
@@ -103,27 +111,67 @@ export default function WhatsappPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginBottom: 12 }}>
-          Kirim Pesan Broadcast {selected.length > 0 && `(${selected.length} kontak dipilih)`}
-        </h3>
-        <p style={{ color: '#6b7280', marginBottom: 12, fontSize: 14 }}>
-          Centang kontak di tabel bawah, lalu tulis 1 pesan untuk dikirim ke semua yang dicentang.
-          Butuh WA_PHONE_NUMBER_ID dan WA_ACCESS_TOKEN aktif di backend.
-        </p>
-        <form onSubmit={handleBroadcast}>
-          <div style={{ marginBottom: 10 }}>
-            <textarea
-              placeholder="Isi pesan untuk semua kontak terpilih"
-              value={broadcastMessage}
-              onChange={(e) => setBroadcastMessage(e.target.value)}
-              required
-              style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', minHeight: 80 }}
-            />
-          </div>
-          <button type="submit" className="btn" disabled={sending}>
-            {sending ? 'Mengirim...' : `Kirim ke ${selected.length} Kontak`}
+        <h3 style={{ marginBottom: 12 }}>Mode Pengiriman</h3>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+          <button
+            className="btn"
+            style={{ background: mode === 'manual' ? '#16a34a' : '#9ca3af' }}
+            onClick={() => setMode('manual')}
+          >
+            Manual (buka WhatsApp)
           </button>
-        </form>
+          <button
+            className="btn"
+            style={{ background: mode === 'api' ? '#16a34a' : '#9ca3af' }}
+            onClick={() => setMode('api')}
+          >
+            Otomatis (API)
+          </button>
+        </div>
+        <p style={{ color: '#6b7280', fontSize: 14 }}>
+          {mode === 'manual'
+            ? 'Mode Manual: tap "Buka WhatsApp" per kontak, pesan sudah terisi otomatis, tinggal tekan kirim di aplikasi WhatsApp.'
+            : 'Mode Otomatis: butuh WA_PHONE_NUMBER_ID & WA_ACCESS_TOKEN aktif di backend (WhatsApp Business API resmi).'}
+        </p>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h3 style={{ marginBottom: 12 }}>
+          Pesan {selected.length > 0 && `(${selected.length} kontak dipilih)`}
+        </h3>
+        <textarea
+          placeholder="Tulis pesan untuk kontak terpilih"
+          value={broadcastMessage}
+          onChange={(e) => setBroadcastMessage(e.target.value)}
+          style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', minHeight: 80, marginBottom: 10 }}
+        />
+
+        {mode === 'api' && (
+          <button className="btn" onClick={handleApiBroadcast} disabled={sending}>
+            {sending ? 'Mengirim...' : `Kirim Otomatis ke ${selected.length} Kontak`}
+          </button>
+        )}
+
+        {mode === 'manual' && selectedContacts.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            {selectedContacts.map((c: any) => (
+              <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ minWidth: 150 }}>{c.name || c.phone}</span>
+                <a
+                  href={waLink(c.phone)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn"
+                  style={{ textDecoration: 'none', display: 'inline-block' }}
+                  onClick={() => handleMarkSent(c.id)}
+                >
+                  Buka WhatsApp
+                </a>
+                {c.lastContactedAt && <span style={{ color: '#16a34a', fontSize: 13 }}>✓ Sudah dihubungi</span>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {status && (
@@ -140,11 +188,7 @@ export default function WhatsappPage() {
             <thead>
               <tr>
                 <th>
-                  <input
-                    type="checkbox"
-                    checked={selected.length === contacts.length}
-                    onChange={toggleSelectAll}
-                  />
+                  <input type="checkbox" checked={selected.length === contacts.length} onChange={toggleSelectAll} />
                 </th>
                 <th>Nama</th>
                 <th>Nomor</th>
@@ -156,21 +200,13 @@ export default function WhatsappPage() {
               {contacts.map((c: any) => (
                 <tr key={c.id}>
                   <td>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(c.id)}
-                      onChange={() => toggleSelect(c.id)}
-                    />
+                    <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleSelect(c.id)} />
                   </td>
                   <td>{c.name || '-'}</td>
                   <td>{c.phone}</td>
                   <td>{c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleString('id-ID') : '-'}</td>
                   <td>
-                    <button
-                      className="btn"
-                      style={{ background: '#dc2626' }}
-                      onClick={() => handleDeleteContact(c.id)}
-                    >
+                    <button className="btn" style={{ background: '#dc2626' }} onClick={() => handleDeleteContact(c.id)}>
                       Hapus
                     </button>
                   </td>
