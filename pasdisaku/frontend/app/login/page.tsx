@@ -19,7 +19,7 @@ export default function LoginPage() {
       localStorage.setItem('refreshToken', data.refreshToken);
       router.push('/dashboard');
     } catch (err: any) {
-      setError('ERROR DEBUG: ' + JSON.stringify(err?.response?.data || err?.message || err));
+      setError('API_URL=' + (process.env.NEXT_PUBLIC_API_URL || 'UNDEFINED') + ' | ERR=' + (err?.message || JSON.stringify(err)));
     }
   }
 
