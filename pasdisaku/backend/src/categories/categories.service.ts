@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -27,7 +28,7 @@ export class CategoriesService {
    */
   async matchCategoryForProduct(productName: string): Promise<bigint | null> {
     const categories = await this.prisma.category.findMany({
-      where: { autoRule: { not: null } },
+      where: { autoRule: { not: Prisma.JsonNull } },
     });
 
     const lowerName = productName.toLowerCase();
