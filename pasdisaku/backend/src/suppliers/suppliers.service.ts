@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
-import { IMPORT_QUEUE, SYNC_QUEUE } from '../queue/queue.module';
+import { IMPORT_QUEUE, SYNC_QUEUE } from '../queue/queue.constants';
 
 @Injectable()
 export class SuppliersService {
