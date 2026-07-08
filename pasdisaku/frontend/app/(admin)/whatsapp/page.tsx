@@ -15,6 +15,8 @@ export default function WhatsappPage() {
   const [status, setStatus] = useState('');
   const [sending, setSending] = useState(false);
   const [mode, setMode] = useState<'manual' | 'api'>('manual');
+  const [queue, setQueue] = useState<any[] | null>(null); // antrian mode manual
+  const [queueIndex, setQueueIndex] = useState(0);
 
   async function handleAddContact(e: React.FormEvent) {
     e.preventDefault();
@@ -50,17 +52,46 @@ export default function WhatsappPage() {
     setSelected(selected.length === contacts.length ? [] : contacts.map((c: any) => c.id));
   }
 
-  function waLink(phone: string) {
-    return `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(broadcastMessage)}`;
+  function waLink(phoneNumber: string) {
+    return `https://wa.me/${phoneNumber.replace(/\D/g, '')}?text=${encodeURIComponent(broadcastMessage)}`;
   }
 
-  async function handleMarkSent(id: string) {
+  function startManualQueue() {
+    if (selected.length === 0) {
+      setStatus('Pilih minimal 1 kontak dulu.');
+      return;
+    }
+    if (!broadcastMessage.trim()) {
+      setStatus('Tulis pesan dulu.');
+      return;
+    }
+    const targets = contacts.filter((c: any) => selected.includes(c.id));
+    setQueue(targets);
+    setQueueIndex(0);
+    setStatus('');
+  }
+
+  async function handleOpenAndNext() {
+    const current = queue![queueIndex];
+    window.open(waLink(current.phone), '_blank');
     try {
-      await api.post(`/crm-whatsapp/contacts/${id}/mark-sent`, { message: broadcastMessage });
-      mutateContacts();
+      await api.post(`/crm-whatsapp/contacts/${current.id}/mark-sent`, { message: broadcastMessage });
     } catch {
       // abaikan, tidak kritis
     }
+    if (queueIndex + 1 < queue!.length) {
+      setQueueIndex(queueIndex + 1);
+    } else {
+      setStatus(`Selesai! ${queue!.length} kontak sudah diproses.`);
+      setQueue(null);
+      setQueueIndex(0);
+      mutateContacts();
+    }
+  }
+
+  function cancelQueue() {
+    setQueue(null);
+    setQueueIndex(0);
   }
 
   async function handleApiBroadcast(e: React.FormEvent) {
@@ -85,8 +116,6 @@ export default function WhatsappPage() {
     setSending(false);
     setStatus(`Selesai: ${success} terkirim, ${failed} gagal.`);
   }
-
-  const selectedContacts = contacts ? contacts.filter((c: any) => selected.includes(c.id)) : [];
 
   return (
     <div className="container">
@@ -130,8 +159,8 @@ export default function WhatsappPage() {
         </div>
         <p style={{ color: '#6b7280', fontSize: 14 }}>
           {mode === 'manual'
-            ? 'Mode Manual: tap "Buka WhatsApp" per kontak, pesan sudah terisi otomatis, tinggal tekan kirim di aplikasi WhatsApp.'
-            : 'Mode Otomatis: butuh WA_PHONE_NUMBER_ID & WA_ACCESS_TOKEN aktif di backend (WhatsApp Business API resmi).'}
+            ? 'Mode Manual: pesan dikirim satu-satu lewat aplikasi WhatsApp, diproses berurutan.'
+            : 'Mode Otomatis: butuh WA_PHONE_NUMBER_ID & WA_ACCESS_TOKEN aktif di backend.'}
         </p>
       </div>
 
@@ -139,37 +168,46 @@ export default function WhatsappPage() {
         <h3 style={{ marginBottom: 12 }}>
           Pesan {selected.length > 0 && `(${selected.length} kontak dipilih)`}
         </h3>
-        <textarea
-          placeholder="Tulis pesan untuk kontak terpilih"
-          value={broadcastMessage}
-          onChange={(e) => setBroadcastMessage(e.target.value)}
-          style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', minHeight: 80, marginBottom: 10 }}
-        />
 
-        {mode === 'api' && (
-          <button className="btn" onClick={handleApiBroadcast} disabled={sending}>
-            {sending ? 'Mengirim...' : `Kirim Otomatis ke ${selected.length} Kontak`}
-          </button>
+        {!queue && (
+          <>
+            <textarea
+              placeholder="Tulis pesan untuk kontak terpilih"
+              value={broadcastMessage}
+              onChange={(e) => setBroadcastMessage(e.target.value)}
+              style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', minHeight: 80, marginBottom: 10 }}
+            />
+
+            {mode === 'api' && (
+              <button className="btn" onClick={handleApiBroadcast} disabled={sending}>
+                {sending ? 'Mengirim...' : `Kirim Otomatis ke ${selected.length} Kontak`}
+              </button>
+            )}
+
+            {mode === 'manual' && (
+              <button className="btn" onClick={startManualQueue}>
+                Mulai Kirim ({selected.length} Kontak)
+              </button>
+            )}
+          </>
         )}
 
-        {mode === 'manual' && selectedContacts.length > 0 && (
-          <div style={{ marginTop: 10 }}>
-            {selectedContacts.map((c: any) => (
-              <div key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ minWidth: 150 }}>{c.name || c.phone}</span>
-                <a
-                  href={waLink(c.phone)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn"
-                  style={{ textDecoration: 'none', display: 'inline-block' }}
-                  onClick={() => handleMarkSent(c.id)}
-                >
-                  Buka WhatsApp
-                </a>
-                {c.lastContactedAt && <span style={{ color: '#16a34a', fontSize: 13 }}>✓ Sudah dihubungi</span>}
-              </div>
-            ))}
+        {queue && (
+          <div style={{ textAlign: 'center', padding: 20 }}>
+            <p style={{ color: '#6b7280', marginBottom: 8 }}>
+              Kontak {queueIndex + 1} dari {queue.length}
+            </p>
+            <h2 style={{ marginBottom: 20 }}>
+              {queue[queueIndex].name || queue[queueIndex].phone}
+            </h2>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button className="btn" onClick={handleOpenAndNext}>
+                Buka WhatsApp &amp; Lanjut
+              </button>
+              <button className="btn" style={{ background: '#9ca3af' }} onClick={cancelQueue}>
+                Batalkan
+              </button>
+            </div>
           </div>
         )}
       </div>
