@@ -21,12 +21,11 @@ export class CrmWhatsappService {
     return { ...contact, id: contact.id.toString() };
   }
 
-  /**
-   * Mengirim pesan lewat WhatsApp Business Cloud API (resmi, Meta).
-   * Perlu WA_PHONE_NUMBER_ID & WA_ACCESS_TOKEN di .env.
-   * Untuk broadcast massal, gunakan template message resmi (bukan free-form)
-   * agar sesuai kebijakan WhatsApp Business.
-   */
+  async deleteContact(id: string) {
+    await this.prisma.waContact.delete({ where: { id: BigInt(id) } });
+    return { success: true };
+  }
+
   async sendMessage(contactPhone: string, message: string, campaignName?: string) {
     const contact = await this.prisma.waContact.upsert({
       where: { phone: contactPhone },
@@ -75,11 +74,12 @@ export class CrmWhatsappService {
     });
   }
 
-  getMessageLogs(contactId?: string) {
-    return this.prisma.waMessageLog.findMany({
+  async getMessageLogs(contactId?: string) {
+    const logs = await this.prisma.waMessageLog.findMany({
       where: contactId ? { contactId: BigInt(contactId) } : undefined,
       orderBy: { sentAt: 'desc' },
       take: 200,
     });
+    return logs.map((l) => ({ ...l, id: l.id.toString(), contactId: l.contactId.toString() }));
   }
 }
