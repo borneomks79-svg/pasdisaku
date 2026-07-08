@@ -18,8 +18,8 @@ export default function LoginPage() {
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       router.push('/dashboard');
-    } catch {
-      setError('Email atau password salah');
+    } catch (err: any) {
+      setError('ERROR DEBUG: ' + JSON.stringify(err?.response?.data || err?.message || err));
     }
   }
 
