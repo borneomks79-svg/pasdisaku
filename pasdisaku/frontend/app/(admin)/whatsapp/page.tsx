@@ -61,6 +61,7 @@ export default function WhatsappPage() {
           </div>
           <button type="submit" className="btn">Tambah Kontak</button>
         </form>
+        {status && <p style={{ marginTop: 10 }}>{status}</p>}
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
