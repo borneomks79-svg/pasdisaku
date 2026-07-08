@@ -130,3 +130,25 @@ export default function WhatsappPage() {
                 <tr key={c.id}>
                   <td>{c.name || '-'}</td>
                   <td>{c.phone}</td>
+                  <td>{c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleString('id-ID') : '-'}</td>
+                  <td style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn" onClick={() => handlePickContact(c.phone)}>
+                      Kirim ke sini
+                    </button>
+                    <button
+                      className="btn"
+                      style={{ background: '#dc2626' }}
+                      onClick={() => handleDeleteContact(c.id)}
+                    >
+                      Hapus
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
