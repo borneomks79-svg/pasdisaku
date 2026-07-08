@@ -10,7 +10,6 @@ export default function WhatsappPage() {
   const { data: contacts, mutate: mutateContacts } = useSWR('/crm-whatsapp/contacts', fetcher);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [message, setMessage] = useState('');
   const [sendPhone, setSendPhone] = useState('');
   const [sendMessage, setSendMessage] = useState('');
   const [status, setStatus] = useState('');
@@ -27,6 +26,22 @@ export default function WhatsappPage() {
     } catch (err: any) {
       setStatus('Gagal: ' + (err?.response?.data?.message || err.message));
     }
+  }
+
+  async function handleDeleteContact(id: string) {
+    if (!confirm('Hapus kontak ini?')) return;
+    try {
+      await api.delete(`/crm-whatsapp/contacts/${id}`);
+      mutateContacts();
+      setStatus('Kontak dihapus.');
+    } catch (err: any) {
+      setStatus('Gagal hapus: ' + (err?.response?.data?.message || err.message));
+    }
+  }
+
+  function handlePickContact(phoneNumber: string) {
+    setSendPhone(phoneNumber);
+    setStatus(`Nomor ${phoneNumber} dipilih untuk kirim pesan.`);
   }
 
   async function handleSend(e: React.FormEvent) {
@@ -61,13 +76,13 @@ export default function WhatsappPage() {
           </div>
           <button type="submit" className="btn">Tambah Kontak</button>
         </form>
-        {status && <p style={{ marginTop: 10 }}>{status}</p>}
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ marginBottom: 12 }}>Kirim Pesan</h3>
         <p style={{ color: '#6b7280', marginBottom: 12, fontSize: 14 }}>
           Butuh WA_PHONE_NUMBER_ID dan WA_ACCESS_TOKEN aktif di backend (WhatsApp Business Cloud API).
+          Tap "Kirim ke sini" di daftar kontak untuk mengisi nomor otomatis.
         </p>
         <form onSubmit={handleSend}>
           <div style={{ marginBottom: 10 }}>
@@ -89,8 +104,13 @@ export default function WhatsappPage() {
           </div>
           <button type="submit" className="btn">Kirim</button>
         </form>
-        {status && <p style={{ marginTop: 10 }}>{status}</p>}
       </div>
+
+      {status && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <p>{status}</p>
+        </div>
+      )}
 
       <div className="card">
         <h3 style={{ marginBottom: 12 }}>Daftar Kontak</h3>
@@ -102,6 +122,7 @@ export default function WhatsappPage() {
                 <th>Nama</th>
                 <th>Nomor</th>
                 <th>Terakhir Dihubungi</th>
+                <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -109,13 +130,3 @@ export default function WhatsappPage() {
                 <tr key={c.id}>
                   <td>{c.name || '-'}</td>
                   <td>{c.phone}</td>
-                  <td>{c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleString('id-ID') : '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
