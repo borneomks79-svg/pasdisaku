@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { ImportService } from '../suppliers/import/import.service';
-import { IMPORT_QUEUE, SYNC_QUEUE } from './queue.module';
+import { IMPORT_QUEUE, SYNC_QUEUE } from './queue.constants';
 
 interface ImportJobData {
   supplierId: string;
