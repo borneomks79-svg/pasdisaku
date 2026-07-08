@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum AdminRole {
+  super_admin
+  operator
+  viewer
+}
+
+enum SourceType {
+  shopee_api
+  tokopedia_api
+  csv_feed
+  custom_api
+}
+
+enum ProductStatus {
+  active
+  draft
+  out_of_stock
+  archived
+}
+
+enum RuleScope {
+  global
+  category
+  supplier
+  product
+}
+
+enum RuleType {
+  percentage
+  fixed_amount
+  tiered
+}
+
+enum OrderSource {
+  manual
+  woocommerce
+  marketplace
+}
+
+enum OrderStatus {
+  pending
+  paid
+  processing
+  shipped
+  completed
+  cancelled
+}
+
+model AdminUser {
+  id           BigInt    @id @default(autoincrement())
+  name         String    @db.VarChar(100)
+  email        String    @unique @db.VarChar(150)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  role         AdminRole @default(operator)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("admin_users")
+}
+
+model Supplier {
+  id                  BigInt    @id @default(autoincrement())
+  name                String    @db.VarChar(150)
+  sourceType          SourceType @map("source_type")
+  apiCredentials      Json?     @map("api_credentials")
+  syncIntervalMinutes Int       @default(60) @map("sync_interval_minutes")
+  lastSyncedAt        DateTime? @map("last_synced_at")
+  isActive            Boolean   @default(true) @map("is_active")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  products Product[]
+
+  @@map("suppliers")
+}
+
+model Category {
+  id       BigInt   @id @default(autoincrement())
+  parentId BigInt?  @map("parent_id")
+  name     String   @db.VarChar(150)
+  slug     String   @unique @db.VarChar(180)
+  autoRule Json?    @map("auto_rule")
+
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryToCategory")
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id             BigInt    @id @default(autoincrement())
+  supplierId     BigInt    @map("supplier_id")
+  externalId     String    @map("external_id") @db.VarChar(150)
+  categoryId     BigInt?   @map("category_id")
+  name           String    @db.VarChar(255)
+  slug           String    @unique @db.VarChar(280)
+  description    String?   @db.Text
+  basePrice      Decimal   @map("base_price") @db.Decimal(15, 2)
+  salePrice      Decimal   @map("sale_price") @db.Decimal(15, 2)
+  stock          Int       @default(0)
+  weightGram     Int       @default(0) @map("weight_gram")
+  images         Json?
+  seoTitle       String?   @map("seo_title") @db.VarChar(255)
+  seoDescription String?   @map("seo_description") @db.VarChar(500)
+  status         ProductStatus @default(draft)
+  woocommerceId  BigInt?   @map("woocommerce_id")
+  lastSyncedAt   DateTime? @map("last_synced_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  supplier   Supplier          @relation(fields: [supplierId], references: [id])
+  category   Category?         @relation(fields: [categoryId], references: [id])
+  syncLogs   ProductSyncLog[]
+  orderItems OrderItem[]
+
+  @@unique([supplierId, externalId], name: "uq_supplier_external")
+  @@index([status])
+  @@index([categoryId])
+  @@map("products")
+}
+
+model ProductSyncLog {
+  id          BigInt   @id @default(autoincrement())
+  productId   BigInt   @map("product_id")
+  oldPrice    Decimal? @map("old_price") @db.Decimal(15, 2)
+  newPrice    Decimal? @map("new_price") @db.Decimal(15, 2)
+  oldStock    Int?     @map("old_stock")
+  newStock    Int?     @map("new_stock")
+  syncStatus  String   @default("success") @map("sync_status") @db.VarChar(20)
+  errorMessage String? @map("error_message") @db.Text
+  syncedAt    DateTime @default(now()) @map("synced_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, syncedAt])
+  @@map("product_sync_logs")
+}
+
+model MarkupRule {
+  id            BigInt    @id @default(autoincrement())
+  name          String?   @db.VarChar(150)
+  scope         RuleScope
+  scopeRefId    BigInt?   @map("scope_ref_id")
+  ruleType      RuleType  @map("rule_type")
+  value         Decimal   @db.Decimal(10, 2)
+  tieredConfig  Json?     @map("tiered_config")
+  priority      Int       @default(0)
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@map("markup_rules")
+}
+
+model Order {
+  id                  BigInt      @id @default(autoincrement())
+  orderNumber         String      @unique @map("order_number") @db.VarChar(50)
+  customerName        String?     @map("customer_name") @db.VarChar(150)
+  customerPhone       String?     @map("customer_phone") @db.VarChar(30)
+  customerAddress     String?     @map("customer_address") @db.Text
+  source              OrderSource @default(manual)
+  status              OrderStatus @default(pending)
+  totalAmount         Decimal     @map("total_amount") @db.Decimal(15, 2)
+  woocommerceOrderId  BigInt?     @map("woocommerce_order_id")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  items OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        BigInt  @id @default(autoincrement())
+  orderId   BigInt  @map("order_id")
+  productId BigInt  @map("product_id")
+  quantity  Int
+  unitPrice Decimal @map("unit_price") @db.Decimal(15, 2)
+  subtotal  Decimal @db.Decimal(15, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model WaContact {
+  id               BigInt    @id @default(autoincrement())
+  name             String?   @db.VarChar(150)
+  phone            String    @unique @db.VarChar(30)
+  tags             Json?
+  lastContactedAt  DateTime? @map("last_contacted_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  messages WaMessageLog[]
+
+  @@map("wa_contacts")
+}
+
+model WaMessageLog {
+  id             BigInt   @id @default(autoincrement())
+  contactId      BigInt   @map("contact_id")
+  campaignName   String?  @map("campaign_name") @db.VarChar(150)
+  messageContent String?  @map("message_content") @db.Text
+  status         String   @default("sent") @db.VarChar(20)
+  sentAt         DateTime @default(now()) @map("sent_at")
+
+  contact WaContact @relation(fields: [contactId], references: [id])
+
+  @@map("wa_messages_log")
+}
+
+model WoocommerceStore {
+  id             BigInt    @id @default(autoincrement())
+  storeUrl       String    @map("store_url") @db.VarChar(255)
+  consumerKey    String    @map("consumer_key") @db.VarChar(255)
+  consumerSecret String    @map("consumer_secret") @db.VarChar(255)
+  isActive       Boolean   @default(true) @map("is_active")
+  lastSyncedAt   DateTime? @map("last_synced_at")
+
+  @@map("woocommerce_stores")
+}
