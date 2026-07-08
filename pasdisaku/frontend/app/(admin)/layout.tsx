@@ -11,6 +11,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/orders" style={{ color: '#fff', textDecoration: 'none' }}>Pesanan</Link>
           <Link href="/suppliers" style={{ color: '#fff', textDecoration: 'none' }}>Supplier</Link>
           <Link href="/markup" style={{ color: '#fff', textDecoration: 'none' }}>Markup</Link>
+          <Link href="/whatsapp" style={{ color: '#fff', textDecoration: 'none' }}>WhatsApp</Link>
         </nav>
       </aside>
       <main style={{ flex: 1 }}>{children}</main>
