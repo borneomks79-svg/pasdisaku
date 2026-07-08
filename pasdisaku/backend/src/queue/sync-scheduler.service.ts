@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
-import { SYNC_QUEUE } from './queue.module';
+import { SYNC_QUEUE } from './queue.constants';
 
 @Injectable()
 export class SyncSchedulerService implements OnModuleInit {
