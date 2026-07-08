@@ -30,7 +30,10 @@ export class CrmWhatsappController {
   ) {
     return this.crmService.sendMessage(phone, message, campaignName);
   }
-
+@Post('contacts/:id/mark-sent')
+  markSent(@Param('id') id: string, @Body('message') message: string) {
+    return this.crmService.markContacted(id, message);
+  }
   @Get('logs')
   getLogs(@Query('contactId') contactId?: string) {
     return this.crmService.getMessageLogs(contactId);
