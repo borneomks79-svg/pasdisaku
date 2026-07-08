@@ -10,9 +10,10 @@ export default function WhatsappPage() {
   const { data: contacts, mutate: mutateContacts } = useSWR('/crm-whatsapp/contacts', fetcher);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [sendPhone, setSendPhone] = useState('');
-  const [sendMessage, setSendMessage] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [broadcastMessage, setBroadcastMessage] = useState('');
   const [status, setStatus] = useState('');
+  const [sending, setSending] = useState(false);
 
   async function handleAddContact(e: React.FormEvent) {
     e.preventDefault();
@@ -33,27 +34,50 @@ export default function WhatsappPage() {
     try {
       await api.delete(`/crm-whatsapp/contacts/${id}`);
       mutateContacts();
+      setSelected((prev) => prev.filter((s) => s !== id));
       setStatus('Kontak dihapus.');
     } catch (err: any) {
       setStatus('Gagal hapus: ' + (err?.response?.data?.message || err.message));
     }
   }
 
-  function handlePickContact(phoneNumber: string) {
-    setSendPhone(phoneNumber);
-    setStatus(`Nomor ${phoneNumber} dipilih untuk kirim pesan.`);
+  function toggleSelect(id: string) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
   }
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus('');
-    try {
-      await api.post('/crm-whatsapp/send', { phone: sendPhone, message: sendMessage });
-      setStatus('Pesan diproses untuk dikirim.');
-      setSendMessage('');
-    } catch (err: any) {
-      setStatus('Gagal kirim: ' + (err?.response?.data?.message || err.message));
+  function toggleSelectAll() {
+    if (!contacts) return;
+    if (selected.length === contacts.length) {
+      setSelected([]);
+    } else {
+      setSelected(contacts.map((c: any) => c.id));
     }
+  }
+
+  async function handleBroadcast(e: React.FormEvent) {
+    e.preventDefault();
+    if (selected.length === 0) {
+      setStatus('Pilih minimal 1 kontak dulu.');
+      return;
+    }
+    setSending(true);
+    setStatus('');
+    const targets = contacts.filter((c: any) => selected.includes(c.id));
+    let success = 0;
+    let failed = 0;
+
+    for (const c of targets) {
+      try {
+        await api.post('/crm-whatsapp/send', { phone: c.phone, message: broadcastMessage });
+        success++;
+      } catch {
+        failed++;
+      }
+    }
+
+    setSending(false);
+    setStatus(`Selesai: ${success} terkirim, ${failed} gagal, dari ${targets.length} kontak terpilih.`);
+    setBroadcastMessage('');
   }
 
   return (
@@ -79,30 +103,26 @@ export default function WhatsappPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginBottom: 12 }}>Kirim Pesan</h3>
+        <h3 style={{ marginBottom: 12 }}>
+          Kirim Pesan Broadcast {selected.length > 0 && `(${selected.length} kontak dipilih)`}
+        </h3>
         <p style={{ color: '#6b7280', marginBottom: 12, fontSize: 14 }}>
-          Butuh WA_PHONE_NUMBER_ID dan WA_ACCESS_TOKEN aktif di backend (WhatsApp Business Cloud API).
-          Tap "Kirim ke sini" di daftar kontak untuk mengisi nomor otomatis.
+          Centang kontak di tabel bawah, lalu tulis 1 pesan untuk dikirim ke semua yang dicentang.
+          Butuh WA_PHONE_NUMBER_ID dan WA_ACCESS_TOKEN aktif di backend.
         </p>
-        <form onSubmit={handleSend}>
-          <div style={{ marginBottom: 10 }}>
-            <input
-              placeholder="Nomor tujuan"
-              value={sendPhone}
-              onChange={(e) => setSendPhone(e.target.value)}
-              required
-            />
-          </div>
+        <form onSubmit={handleBroadcast}>
           <div style={{ marginBottom: 10 }}>
             <textarea
-              placeholder="Isi pesan"
-              value={sendMessage}
-              onChange={(e) => setSendMessage(e.target.value)}
+              placeholder="Isi pesan untuk semua kontak terpilih"
+              value={broadcastMessage}
+              onChange={(e) => setBroadcastMessage(e.target.value)}
               required
               style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', minHeight: 80 }}
             />
           </div>
-          <button type="submit" className="btn">Kirim</button>
+          <button type="submit" className="btn" disabled={sending}>
+            {sending ? 'Mengirim...' : `Kirim ke ${selected.length} Kontak`}
+          </button>
         </form>
       </div>
 
@@ -119,6 +139,13 @@ export default function WhatsappPage() {
           <table>
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={selected.length === contacts.length}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
                 <th>Nama</th>
                 <th>Nomor</th>
                 <th>Terakhir Dihubungi</th>
@@ -128,13 +155,17 @@ export default function WhatsappPage() {
             <tbody>
               {contacts.map((c: any) => (
                 <tr key={c.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(c.id)}
+                      onChange={() => toggleSelect(c.id)}
+                    />
+                  </td>
                   <td>{c.name || '-'}</td>
                   <td>{c.phone}</td>
                   <td>{c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleString('id-ID') : '-'}</td>
-                  <td style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn" onClick={() => handlePickContact(c.phone)}>
-                      Kirim ke sini
-                    </button>
+                  <td>
                     <button
                       className="btn"
                       style={{ background: '#dc2626' }}
