@@ -7,16 +7,18 @@ export class CrmWhatsappService {
 
   constructor(private prisma: PrismaService) {}
 
-  findAllContacts() {
-    return this.prisma.waContact.findMany({ orderBy: { createdAt: 'desc' } });
+  async findAllContacts() {
+    const contacts = await this.prisma.waContact.findMany({ orderBy: { createdAt: 'desc' } });
+    return contacts.map((c) => ({ ...c, id: c.id.toString() }));
   }
 
   async upsertContact(name: string, phone: string, tags?: string[]) {
-    return this.prisma.waContact.upsert({
+    const contact = await this.prisma.waContact.upsert({
       where: { phone },
       update: { name, tags },
       create: { name, phone, tags },
     });
+    return { ...contact, id: contact.id.toString() };
   }
 
   /**
