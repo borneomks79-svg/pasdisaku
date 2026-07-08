@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ImportProcessor, SyncProcessor } from './import.processor';
-import { SyncSchedulerService } from './sync-scheduler.service';
 import { ImportEngineModule } from '../suppliers/import/import-engine.module';
 
 export const IMPORT_QUEUE = 'import-products';
@@ -18,7 +17,7 @@ export const SYNC_QUEUE = 'sync-price-stock';
     BullModule.registerQueue({ name: IMPORT_QUEUE }, { name: SYNC_QUEUE }),
     ImportEngineModule,
   ],
-  providers: [ImportProcessor, SyncProcessor, SyncSchedulerService],
+  providers: [ImportProcessor, SyncProcessor],
   exports: [BullModule],
 })
 export class QueueModule {}
