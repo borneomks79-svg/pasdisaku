@@ -9,6 +9,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/dashboard" style={{ color: '#fff', textDecoration: 'none' }}>Dashboard</Link>
           <Link href="/products" style={{ color: '#fff', textDecoration: 'none' }}>Produk</Link>
           <Link href="/orders" style={{ color: '#fff', textDecoration: 'none' }}>Pesanan</Link>
+          <Link href="/suppliers" style={{ color: '#fff', textDecoration: 'none' }}>Supplier</Link>
         </nav>
       </aside>
       <main style={{ flex: 1 }}>{children}</main>
