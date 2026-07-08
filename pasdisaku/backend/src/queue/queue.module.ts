@@ -2,9 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ImportProcessor, SyncProcessor } from './import.processor';
 import { ImportEngineModule } from '../suppliers/import/import-engine.module';
-
-export const IMPORT_QUEUE = 'import-products';
-export const SYNC_QUEUE = 'sync-price-stock';
+import { IMPORT_QUEUE, SYNC_QUEUE } from './queue.constants';
 
 @Module({
   imports: [
