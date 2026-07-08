@@ -89,4 +89,12 @@ async markContacted(id: string, message: string) {
     });
     await this.logMessage(contact.id, message, 'manual', 'sent');
     return { success: true };
+  async markContacted(id: string, message: string) {
+    const contact = await this.prisma.waContact.update({
+      where: { id: BigInt(id) },
+      data: { lastContactedAt: new Date() },
+    });
+    await this.logMessage(contact.id, message, 'manual', 'sent');
+    return { success: true };
+  }
   }
