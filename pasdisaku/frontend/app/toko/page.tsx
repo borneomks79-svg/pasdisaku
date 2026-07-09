@@ -14,8 +14,8 @@ const publicApi = axios.create({
 
 const fetcher = (url: string) => publicApi.get(url).then((res) => res.data);
 
-const const ORANGE = '#0ea5e9';
-const const ORANGE_DARK = '#0284c7';
+const ORANGE = '#0ea5e9';
+const ORANGE_DARK = '#0284c7';
 
 const CATEGORY_ICONS: Record<string, string> = {
   elektronik: '🔌',
