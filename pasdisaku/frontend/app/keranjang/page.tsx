@@ -2,19 +2,34 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
+import axios from 'axios';
 import { useCart } from '../../lib/useCart';
 import { updateQty, removeFromCart, cartTotal } from '../../lib/cart';
+
+const BLUE = '#0ea5e9';
+const BLUE_DARK = '#0284c7';
+
+const publicApi = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+});
+const fetcher = (url: string) => publicApi.get(url).then((res) => res.data);
 
 export default function KeranjangPage() {
   const cart = useCart();
   const router = useRouter();
   const total = cartTotal(cart);
 
+  const { data } = useSWR('/public/products?page=1&pageSize=8', fetcher);
+  const allProducts = data?.items || data?.data || [];
+  const cartIds = new Set(cart.map((c) => c.id));
+  const recommended = allProducts.filter((p: any) => !cartIds.has(p.id)).slice(0, 6);
+
   return (
-    <div style={{ minHeight: '100vh', background: '#fafafa', paddingBottom: cart.length > 0 ? 110 : 20 }}>
+    <div style={{ minHeight: '100vh', background: '#f5f5f5', paddingBottom: cart.length > 0 ? 110 : 20 }}>
       <div
         style={{
-          background: 'linear-gradient(135deg, #059669, #047857)',
+          background: `linear-gradient(135deg, ${BLUE}, ${BLUE_DARK})`,
           padding: '16px',
           display: 'flex',
           alignItems: 'center',
@@ -30,67 +45,129 @@ export default function KeranjangPage() {
 
       <div style={{ maxWidth: 560, margin: '0 auto', padding: 16 }}>
         {cart.length === 0 ? (
-          <div style={{ textAlign: 'center', marginTop: 80 }}>
+          <div style={{ textAlign: 'center', marginTop: 60 }}>
             <div style={{ fontSize: 48, opacity: 0.3, marginBottom: 12 }}>🛒</div>
             <p style={{ color: '#9ca3af', marginBottom: 16, fontSize: 14 }}>Keranjang kosong.</p>
-            <Link href="/toko" style={{ color: '#059669', fontWeight: 700, fontSize: 14 }}>Mulai belanja →</Link>
+            <Link href="/toko" style={{ color: BLUE, fontWeight: 700, fontSize: 14 }}>Mulai belanja →</Link>
           </div>
         ) : (
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {cart.map((item) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {cart.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  background: 'white',
+                  borderRadius: 14,
+                  padding: 12,
+                  boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
+                }}
+              >
                 <div
-                  key={item.id}
                   style={{
+                    width: 68,
+                    height: 68,
+                    borderRadius: 12,
+                    background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
+                    backgroundImage: item.image ? `url(${item.image})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    flexShrink: 0,
                     display: 'flex',
-                    gap: 12,
-                    background: 'white',
-                    borderRadius: 14,
-                    padding: 12,
-                    boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 22,
+                    opacity: item.image ? 1 : 0.4,
                   }}
                 >
-                  <div
-                    style={{
-                      width: 68,
-                      height: 68,
-                      borderRadius: 12,
-                      background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
-                      backgroundImage: item.image ? `url(${item.image})` : undefined,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      flexShrink: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 22,
-                      opacity: item.image ? 1 : 0.4,
-                    }}
-                  >
-                    {!item.image && '📦'}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13.5, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {item.name}
-                    </p>
-                    <p style={{ fontSize: 14, fontWeight: 800, color: '#047857', margin: '4px 0 8px' }}>
-                      Rp{item.price.toLocaleString('id-ID')}
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e5e7eb', borderRadius: 8 }}>
-                        <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ padding: '4px 10px', background: 'white', border: 'none', color: '#374151' }}>−</button>
-                        <span style={{ padding: '0 10px', fontSize: 13, fontWeight: 700 }}>{item.qty}</span>
-                        <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ padding: '4px 10px', background: 'white', border: 'none', color: '#374151' }}>+</button>
-                      </div>
-                      <button onClick={() => removeFromCart(item.id)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', fontWeight: 600 }}>
-                        Hapus
-                      </button>
+                  {!item.image && '📦'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 13.5, fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.name}
+                  </p>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: BLUE_DARK, margin: '4px 0 8px' }}>
+                    Rp{item.price.toLocaleString('id-ID')}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', border: '1.5px solid #e5e7eb', borderRadius: 8 }}>
+                      <button onClick={() => updateQty(item.id, item.qty - 1)} style={{ padding: '4px 10px', background: 'white', border: 'none', color: '#374151' }}>−</button>
+                      <span style={{ padding: '0 10px', fontSize: 13, fontWeight: 700 }}>{item.qty}</span>
+                      <button onClick={() => updateQty(item.id, item.qty + 1)} style={{ padding: '4px 10px', background: 'white', border: 'none', color: '#374151' }}>+</button>
                     </div>
+                    <button onClick={() => removeFromCart(item.id)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', fontWeight: 600 }}>
+                      Hapus
+                    </button>
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {recommended.length > 0 && (
+          <div style={{ marginTop: 24 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#374151', marginBottom: 10 }}>
+              ✨ Yuk, lengkapi belanjaanmu
+            </p>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 8,
+              }}
+            >
+              {recommended.map((p: any) => {
+                const price = p.salePrice ?? p.basePrice ?? 0;
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/toko/${p.slug}`}
+                    style={{ display: 'block', background: 'white', borderRadius: 12, overflow: 'hidden', textDecoration: 'none', color: 'inherit', boxShadow: '0 1px 6px rgba(0,0,0,0.06)' }}
+                  >
+                    <div
+                      style={{
+                        width: '100%',
+                        aspectRatio: '1 / 1',
+                        background: 'linear-gradient(135deg, #f3f4f6, #e5e7eb)',
+                        backgroundImage: p.images ? `url(${Array.isArray(p.images) ? p.images[0] : p.images})` : undefined,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 24,
+                        opacity: p.images ? 1 : 0.3,
+                      }}
+                    >
+                      {!p.images && '📦'}
+                    </div>
+                    <div style={{ padding: '8px 9px 10px' }}>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          margin: 0,
+                          lineHeight: 1.3,
+                          overflow: 'hidden',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          minHeight: '2.4em',
+                        }}
+                      >
+                        {p.name}
+                      </p>
+                      <p style={{ fontSize: 13, fontWeight: 800, color: BLUE_DARK, marginTop: 4, marginBottom: 0 }}>
+                        Rp{Number(price).toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -114,7 +191,7 @@ export default function KeranjangPage() {
           </div>
           <button
             onClick={() => router.push('/checkout')}
-            style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: '#059669', color: 'white', fontWeight: 700, fontSize: 15 }}
+            style={{ width: '100%', padding: '14px', borderRadius: 12, border: 'none', background: BLUE, color: 'white', fontWeight: 700, fontSize: 15 }}
           >
             Lanjut ke Checkout
           </button>
