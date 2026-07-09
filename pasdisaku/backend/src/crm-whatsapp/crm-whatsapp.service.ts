@@ -26,6 +26,24 @@ export class CrmWhatsappService {
     return { success: true };
   }
 
+  async bulkImportContacts(contacts: { name: string; phone: string }[]) {
+    let created = 0;
+    let skipped = 0;
+    for (const c of contacts) {
+      if (!c.phone) {
+        skipped++;
+        continue;
+      }
+      await this.prisma.waContact.upsert({
+        where: { phone: c.phone },
+        update: { name: c.name },
+        create: { name: c.name, phone: c.phone },
+      });
+      created++;
+    }
+    return { created, skipped, total: contacts.length };
+  }
+
   async sendMessage(contactPhone: string, message: string, campaignName?: string) {
     const contact = await this.prisma.waContact.upsert({
       where: { phone: contactPhone },
@@ -74,21 +92,6 @@ export class CrmWhatsappService {
     });
   }
 
-  async getMessageLogs(contactId?: string) {
-    const logs = await this.prisma.waMessageLog.findMany({
-      where: contactId ? { contactId: BigInt(contactId) } : undefined,
-      orderBy: { sentAt: 'desc' },
-      take: 200,
-    });
-    return logs.map((l) => ({ ...l, id: l.id.toString(), contactId: l.contactId.toString() }));
-  }
-async markContacted(id: string, message: string) {
-    const contact = await this.prisma.waContact.update({
-      where: { id: BigInt(id) },
-      data: { lastContactedAt: new Date() },
-    });
-    await this.logMessage(contact.id, message, 'manual', 'sent');
-    return { success: true };
   async markContacted(id: string, message: string) {
     const contact = await this.prisma.waContact.update({
       where: { id: BigInt(id) },
@@ -97,4 +100,13 @@ async markContacted(id: string, message: string) {
     await this.logMessage(contact.id, message, 'manual', 'sent');
     return { success: true };
   }
+
+  async getMessageLogs(contactId?: string) {
+    const logs = await this.prisma.waMessageLog.findMany({
+      where: contactId ? { contactId: BigInt(contactId) } : undefined,
+      orderBy: { sentAt: 'desc' },
+      take: 200,
+    });
+    return logs.map((l) => ({ ...l, id: l.id.toString(), contactId: l.contactId.toString() }));
   }
+}
