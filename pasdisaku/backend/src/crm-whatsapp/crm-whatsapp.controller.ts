@@ -17,9 +17,19 @@ export class CrmWhatsappController {
     return this.crmService.upsertContact(name, phone, tags);
   }
 
+  @Post('contacts/bulk-import')
+  bulkImport(@Body('contacts') contacts: { name: string; phone: string }[]) {
+    return this.crmService.bulkImportContacts(contacts);
+  }
+
   @Delete('contacts/:id')
   deleteContact(@Param('id') id: string) {
     return this.crmService.deleteContact(id);
+  }
+
+  @Post('contacts/:id/mark-sent')
+  markSent(@Param('id') id: string, @Body('message') message: string) {
+    return this.crmService.markContacted(id, message);
   }
 
   @Post('send')
@@ -30,10 +40,7 @@ export class CrmWhatsappController {
   ) {
     return this.crmService.sendMessage(phone, message, campaignName);
   }
-@Post('contacts/:id/mark-sent')
-  markSent(@Param('id') id: string, @Body('message') message: string) {
-    return this.crmService.markContacted(id, message);
-  }
+
   @Get('logs')
   getLogs(@Query('contactId') contactId?: string) {
     return this.crmService.getMessageLogs(contactId);
