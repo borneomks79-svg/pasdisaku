@@ -14,14 +14,20 @@ const fetcher = (url: string) => publicApi.get(url).then((res) => res.data);
 export default function TokoPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const { data: categoriesData } = useSWR('/public/categories', fetcher);
+  const categories = categoriesData || [];
 
   const { data, isLoading, error } = useSWR(
-    `/public/products?search=${encodeURIComponent(search)}&page=${page}&pageSize=12`,
+    `/public/products?search=${encodeURIComponent(search)}&page=${page}&pageSize=12${
+      activeCategory ? `&category=${encodeURIComponent(activeCategory)}` : ''
+    }`,
     fetcher
   );
 
   const products = data?.items || data?.data || [];
-  const totalPages = data?.totalPages || 1;
+  const totalPages = data?.pagination?.totalPages || data?.totalPages || 1;
 
   return (
     <div style={{ minHeight: '100vh', background: '#f7fafc' }}>
@@ -57,6 +63,60 @@ export default function TokoPage() {
           }}
         />
 
+        {categories.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              overflowX: 'auto',
+              padding: '18px 2px',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            <button
+              onClick={() => {
+                setActiveCategory(null);
+                setPage(1);
+              }}
+              style={{
+                flexShrink: 0,
+                padding: '8px 18px',
+                borderRadius: 999,
+                border: '1px solid #00a86b',
+                background: !activeCategory ? '#00a86b' : 'white',
+                color: !activeCategory ? 'white' : '#00a86b',
+                fontWeight: 600,
+                fontSize: 14,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Semua
+            </button>
+            {categories.map((c: any) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  setActiveCategory(c.slug);
+                  setPage(1);
+                }}
+                style={{
+                  flexShrink: 0,
+                  padding: '8px 18px',
+                  borderRadius: 999,
+                  border: '1px solid #00a86b',
+                  background: activeCategory === c.slug ? '#00a86b' : 'white',
+                  color: activeCategory === c.slug ? 'white' : '#00a86b',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {c.name} ({c.productCount})
+              </button>
+            ))}
+          </div>
+        )}
+
         {isLoading && (
           <p style={{ textAlign: 'center', marginTop: 40, color: '#718096' }}>
             Memuat produk...
@@ -80,7 +140,7 @@ export default function TokoPage() {
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
             gap: 16,
-            marginTop: 24,
+            marginTop: 8,
           }}
         >
           {products.map((p: any) => {
@@ -88,7 +148,7 @@ export default function TokoPage() {
             return (
               <Link
                 key={p.id}
-                href={`/toko/${p.id}`}
+                href={`/toko/${p.slug}`}
                 style={{
                   display: 'block',
                   background: 'white',
@@ -112,6 +172,20 @@ export default function TokoPage() {
                   }}
                 />
                 <div style={{ padding: 12 }}>
+                  {p.category?.name && (
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: '#00a86b',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        margin: 0,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {p.category.name}
+                    </p>
+                  )}
                   <p
                     style={{
                       fontSize: 14,
