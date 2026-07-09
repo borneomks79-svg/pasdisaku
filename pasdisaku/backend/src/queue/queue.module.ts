@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { ImportProcessor, SyncProcessor } from './import.processor';
 import { ImportEngineModule } from '../suppliers/import/import-engine.module';
 import { IMPORT_QUEUE, SYNC_QUEUE } from './queue.constants';
+import { SyncSchedulerService } from './sync-scheduler.service';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { IMPORT_QUEUE, SYNC_QUEUE } from './queue.constants';
     BullModule.registerQueue({ name: IMPORT_QUEUE }, { name: SYNC_QUEUE }),
     ImportEngineModule,
   ],
-  providers: [ImportProcessor, SyncProcessor],
+  providers: [ImportProcessor, SyncProcessor, SyncSchedulerService],
   exports: [BullModule],
 })
 export class QueueModule {}
