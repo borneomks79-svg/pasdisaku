@@ -62,6 +62,25 @@ export default function ProductDetailPage() {
       </div>
 
       <div style={{ maxWidth: 600, margin: '0 auto', padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#718096', marginBottom: 16, flexWrap: 'wrap' }}>
+          <Link href="/toko" style={{ color: '#718096', textDecoration: 'none' }}>Toko</Link>
+          {product.category?.name && (
+            <>
+              <span>/</span>
+              <Link
+                href={`/toko?category=${product.category.slug}`}
+                style={{ color: '#00a86b', textDecoration: 'none', fontWeight: 600 }}
+              >
+                {product.category.name}
+              </Link>
+            </>
+          )}
+          <span>/</span>
+          <span style={{ color: '#2d3748', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+            {product.name}
+          </span>
+        </div>
+
         <div style={{ width: '100%', aspectRatio: '1 / 1', background: '#edf2f7', borderRadius: 16, backgroundImage: image ? `url(${image})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', marginBottom: 20 }} />
 
         {product.category?.name && (
