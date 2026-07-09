@@ -75,6 +75,10 @@ export class ImportService {
               basePrice: item.price,
               salePrice,
               stock: item.stock,
+              // Kalau produk lama belum punya kategori (mis. kategori barunya
+              // baru dibuat setelah produk ini pertama kali diimpor), coba
+              // cocokkan ulang di setiap import/sync berikutnya.
+              categoryId: existing.categoryId ?? categoryId,
               lastSyncedAt: new Date(),
               status: item.stock > 0 ? 'active' : 'out_of_stock',
             },
@@ -122,6 +126,8 @@ export class ImportService {
   /**
    * Sync ringan (harga & stok saja) untuk supplier yang sudah punya produk.
    * Dipanggil oleh cron/repeatable job sesuai sync_interval_minutes.
+   * Juga mencoba re-kategorisasi produk yang masih belum punya kategori,
+   * berdasarkan namanya sendiri (berguna kalau kategori baru dibuat belakangan).
    */
   async syncPriceStock(supplierId: string) {
     const supplier = await this.prisma.supplier.findUnique({ where: { id: BigInt(supplierId) } });
@@ -132,7 +138,7 @@ export class ImportService {
 
     const existingProducts = await this.prisma.product.findMany({
       where: { supplierId: supplier.id },
-      select: { id: true, externalId: true, basePrice: true, stock: true, categoryId: true },
+      select: { id: true, externalId: true, name: true, basePrice: true, stock: true, categoryId: true },
     });
 
     const externalIds = existingProducts.map((p) => p.externalId);
@@ -152,11 +158,19 @@ export class ImportService {
 
         const priceChanged = Number(existing.basePrice) !== item.price;
         const stockChanged = existing.stock !== item.stock;
-        if (!priceChanged && !stockChanged) continue;
+
+        let categoryId = existing.categoryId;
+        let categoryReassigned = false;
+        if (!categoryId) {
+          categoryId = await this.categoriesService.matchCategoryForProduct(existing.name);
+          if (categoryId) categoryReassigned = true;
+        }
+
+        if (!priceChanged && !stockChanged && !categoryReassigned) continue;
 
         const salePrice = await this.pricingService.calculateSalePrice({
           basePrice: item.price,
-          categoryId: existing.categoryId,
+          categoryId,
           supplierId: supplier.id,
         });
 
@@ -166,21 +180,24 @@ export class ImportService {
             basePrice: item.price,
             salePrice,
             stock: item.stock,
+            categoryId,
             lastSyncedAt: new Date(),
             status: item.stock > 0 ? 'active' : 'out_of_stock',
           },
         });
 
-        await this.prisma.productSyncLog.create({
-          data: {
-            productId: existing.id,
-            oldPrice: existing.basePrice,
-            newPrice: item.price,
-            oldStock: existing.stock,
-            newStock: item.stock,
-            syncStatus: 'success',
-          },
-        });
+        if (priceChanged || stockChanged) {
+          await this.prisma.productSyncLog.create({
+            data: {
+              productId: existing.id,
+              oldPrice: existing.basePrice,
+              newPrice: item.price,
+              oldStock: existing.stock,
+              newStock: item.stock,
+              syncStatus: 'success',
+            },
+          });
+        }
 
         updated++;
       }
