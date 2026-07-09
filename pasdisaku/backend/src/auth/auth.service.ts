@@ -54,7 +54,20 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token tidak valid');
     }
   }
+async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    const user = await this.prisma.adminUser.findUnique({ where: { id: BigInt(userId) } });
+    if (!user) throw new UnauthorizedException('User tidak ditemukan');
 
+    const valid = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!valid) throw new UnauthorizedException('Password lama salah');
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.adminUser.update({
+      where: { id: user.id },
+      data: { passwordHash: newHash },
+    });
+    return { success: true };
+  }
   async createAdmin(name: string, email: string, password: string, role: string = 'operator') {
     const passwordHash = await bcrypt.hash(password, 10);
     return this.prisma.adminUser.create({
