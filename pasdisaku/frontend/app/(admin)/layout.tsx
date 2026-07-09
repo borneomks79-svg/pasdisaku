@@ -8,6 +8,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Link href="/dashboard" style={{ color: '#fff', textDecoration: 'none' }}>Dashboard</Link>
           <Link href="/products" style={{ color: '#fff', textDecoration: 'none' }}>Produk</Link>
+          <Link href="/categories" style={{ color: '#fff', textDecoration: 'none' }}>Kategori</Link>
           <Link href="/orders" style={{ color: '#fff', textDecoration: 'none' }}>Pesanan</Link>
           <Link href="/suppliers" style={{ color: '#fff', textDecoration: 'none' }}>Supplier</Link>
           <Link href="/markup" style={{ color: '#fff', textDecoration: 'none' }}>Markup</Link>
