@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -10,15 +10,64 @@ export class CategoriesService {
     return this.prisma.category.findMany({ orderBy: { name: 'asc' } });
   }
 
+  async findAllPublic() {
+    const categories = await this.prisma.category.findMany({
+      orderBy: { name: 'asc' },
+      include: {
+        _count: { select: { products: { where: { status: 'active' } } } },
+      },
+    });
+
+    return categories.map((c) => ({
+      id: c.id.toString(),
+      parentId: c.parentId ? c.parentId.toString() : null,
+      name: c.name,
+      slug: c.slug,
+      productCount: c._count.products,
+    }));
+  }
+
   create(name: string, slug: string, parentId?: string, autoRule?: any) {
     return this.prisma.category.create({
       data: {
         name,
         slug,
         parentId: parentId ? BigInt(parentId) : undefined,
-        autoRule,
+        autoRule: autoRule ?? Prisma.JsonNull,
       },
     });
+  }
+
+  async update(id: string, name?: string, slug?: string, parentId?: string, autoRule?: any) {
+    const existing = await this.prisma.category.findUnique({ where: { id: BigInt(id) } });
+    if (!existing) throw new NotFoundException('Kategori tidak ditemukan');
+
+    return this.prisma.category.update({
+      where: { id: BigInt(id) },
+      data: {
+        name: name ?? undefined,
+        slug: slug ?? undefined,
+        parentId: parentId === undefined ? undefined : parentId ? BigInt(parentId) : null,
+        autoRule: autoRule === undefined ? undefined : autoRule ?? Prisma.JsonNull,
+      },
+    });
+  }
+
+  async remove(id: string) {
+    const existing = await this.prisma.category.findUnique({ where: { id: BigInt(id) } });
+    if (!existing) throw new NotFoundException('Kategori tidak ditemukan');
+
+    await this.prisma.product.updateMany({
+      where: { categoryId: BigInt(id) },
+      data: { categoryId: null },
+    });
+
+    await this.prisma.category.updateMany({
+      where: { parentId: BigInt(id) },
+      data: { parentId: null },
+    });
+
+    return this.prisma.category.delete({ where: { id: BigInt(id) } });
   }
 
   /**
