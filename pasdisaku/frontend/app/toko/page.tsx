@@ -83,49 +83,54 @@ export default function TokoPage() {
             marginTop: 24,
           }}
         >
-          {products.map((p: any) => (
-            <Link
-              key={p.id}
-              href={`/toko/${p.id}`}
-              style={{
-                display: 'block',
-                background: 'white',
-                borderRadius: 14,
-                overflow: 'hidden',
-                textDecoration: 'none',
-                color: 'inherit',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-              }}
-            >
-              <div
+          {products.map((p: any) => {
+            const price = p.salePrice ?? p.basePrice ?? p.price ?? 0;
+            return (
+              <Link
+                key={p.id}
+                href={`/toko/${p.id}`}
                 style={{
-                  width: '100%',
-                  aspectRatio: '1 / 1',
-                  background: '#edf2f7',
-                  backgroundImage: p.imageUrl ? `url(${p.imageUrl})` : undefined,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
+                  display: 'block',
+                  background: 'white',
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
                 }}
-              />
-              <div style={{ padding: 12 }}>
-                <p
+              >
+                <div
                   style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    margin: 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    width: '100%',
+                    aspectRatio: '1 / 1',
+                    background: '#edf2f7',
+                    backgroundImage: p.images
+                      ? `url(${Array.isArray(p.images) ? p.images[0] : p.images})`
+                      : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
                   }}
-                >
-                  {p.name}
-                </p>
-                <p style={{ fontSize: 15, fontWeight: 800, color: '#007a4d', marginTop: 6 }}>
-                  Rp{Number(p.price || 0).toLocaleString('id-ID')}
-                </p>
-              </div>
-            </Link>
-          ))}
+                />
+                <div style={{ padding: 12 }}>
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      margin: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {p.name}
+                  </p>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: '#007a4d', marginTop: 6 }}>
+                    Rp{Number(price).toLocaleString('id-ID')}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
         </div>
 
         {!isLoading && products.length > 0 && (
