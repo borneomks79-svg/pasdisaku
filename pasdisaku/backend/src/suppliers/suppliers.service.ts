@@ -18,6 +18,7 @@ export class SuppliersService {
 
   async create(data: {
     name: string;
+    whatsappNumber?: string;
     sourceType: string;
     apiCredentials: any;
     syncIntervalMinutes?: number;
@@ -25,13 +26,13 @@ export class SuppliersService {
     const supplier = await this.prisma.supplier.create({
       data: {
         name: data.name,
+        whatsappNumber: data.whatsappNumber ? this.normalizePhone(data.whatsappNumber) : null,
         sourceType: data.sourceType as any,
         apiCredentials: data.apiCredentials,
         syncIntervalMinutes: data.syncIntervalMinutes || 60,
       },
     });
 
-    // Daftarkan repeatable sync job untuk supplier baru
     await this.syncQueue.add(
       'sync-price-stock',
       { supplierId: supplier.id.toString() },
@@ -46,7 +47,19 @@ export class SuppliersService {
     return supplier;
   }
 
-  /** Trigger import awal (bulk) secara manual lewat dashboard admin */
+  async update(id: string, data: { name?: string; whatsappNumber?: string }) {
+    return this.prisma.supplier.update({
+      where: { id: BigInt(id) },
+      data: {
+        name: data.name ?? undefined,
+        whatsappNumber:
+          data.whatsappNumber !== undefined
+            ? (data.whatsappNumber ? this.normalizePhone(data.whatsappNumber) : null)
+            : undefined,
+      },
+    });
+  }
+
   async triggerImport(supplierId: string) {
     const job = await this.importQueue.add(
       'import-products',
@@ -56,13 +69,5 @@ export class SuppliersService {
     return { jobId: job.id, status: 'queued' };
   }
 
-  /** Trigger sync harga/stok secara manual (di luar jadwal) */
   async triggerSync(supplierId: string) {
-    const job = await this.syncQueue.add(
-      'sync-price-stock',
-      { supplierId },
-      { removeOnComplete: 20, removeOnFail: 20 },
-    );
-    return { jobId: job.id, status: 'queued' };
-  }
-}
+    const job = await this.syncQueue.a
