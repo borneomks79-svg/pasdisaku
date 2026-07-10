@@ -70,5 +70,18 @@ export class SuppliersService {
   }
 
   async triggerSync(supplierId: string) {
-    const job = await this.syncQueue.a
+    const job = await this.syncQueue.add(
+      'sync-price-stock',
+      { supplierId },
+      { removeOnComplete: 20, removeOnFail: 20 },
+    );
+    return { jobId: job.id, status: 'queued' };
   }
+
+  private normalizePhone(raw: string): string {
+    let s = String(raw || '').replace(/\D/g, '');
+    if (s.startsWith('0')) s = '62' + s.slice(1);
+    if (!s.startsWith('62') && s.length > 0) s = '62' + s;
+    return s;
+  }
+}
