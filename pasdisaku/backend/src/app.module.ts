@@ -11,6 +11,7 @@ import { OrdersModule } from './orders/orders.module';
 import { CrmWhatsappModule } from './crm-whatsapp/crm-whatsapp.module';
 import { WoocommerceModule } from './woocommerce/woocommerce.module';
 import { QueueModule } from './queue/queue.module';
+import { BackupModule } from './backup/backup.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { QueueModule } from './queue/queue.module';
     OrdersModule,
     CrmWhatsappModule,
     WoocommerceModule,
+    BackupModule,
   ],
 })
 export class AppModule {}
