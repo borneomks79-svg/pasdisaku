@@ -14,4 +14,4 @@ RUN npm run build
 
 EXPOSE 3001
 
-CMD ["npm", "run", "start:prod"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate --accept-data-loss && npm run start:prod"]
