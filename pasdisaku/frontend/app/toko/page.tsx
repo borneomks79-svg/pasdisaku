@@ -173,7 +173,7 @@ export default function TokoPage() {
                   )}
                   <p style={{
                     fontSize: 12.5, fontWeight: 500, margin: 0, lineHeight: 1.35, color: '#222',
-                    overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', minHeight: '1.8em',
+                    overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', minHeight: '1.2em',
                   }}>
                     {p.name}
                   </p>
