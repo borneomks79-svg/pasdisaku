@@ -9,9 +9,13 @@ const fetcher = (url: string) => api.get(url).then((res) => res.data);
 export default function SuppliersPage() {
   const { data, isLoading, mutate } = useSWR('/suppliers', fetcher);
   const [name, setName] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const [feedUrl, setFeedUrl] = useState('');
   const [interval, setInterval] = useState('60');
   const [message, setMessage] = useState('');
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editWa, setEditWa] = useState('');
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -19,11 +23,13 @@ export default function SuppliersPage() {
     try {
       await api.post('/suppliers', {
         name,
+        whatsappNumber,
         sourceType: 'csv_feed',
         apiCredentials: { feedUrl },
         syncIntervalMinutes: parseInt(interval, 10),
       });
       setName('');
+      setWhatsappNumber('');
       setFeedUrl('');
       setInterval('60');
       mutate();
@@ -53,6 +59,21 @@ export default function SuppliersPage() {
     }
   }
 
+  function startEditWa(s: any) {
+    setEditingId(s.id);
+    setEditWa(s.whatsappNumber || '');
+  }
+
+  async function saveEditWa(id: string) {
+    try {
+      await api.patch(`/suppliers/${id}`, { whatsappNumber: editWa });
+      setEditingId(null);
+      mutate();
+    } catch (err: any) {
+      setMessage('Gagal simpan nomor WA: ' + (err?.response?.data?.message || err.message));
+    }
+  }
+
   return (
     <div className="container">
       <h1 style={{ marginBottom: 20 }}>Supplier</h1>
@@ -66,6 +87,13 @@ export default function SuppliersPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+            />
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <input
+              placeholder="Nomor WhatsApp supplier (contoh: 08123456789)"
+              value={whatsappNumber}
+              onChange={(e) => setWhatsappNumber(e.target.value)}
             />
           </div>
           <div style={{ marginBottom: 10 }}>
@@ -97,6 +125,7 @@ export default function SuppliersPage() {
             <thead>
               <tr>
                 <th>Nama</th>
+                <th>Nomor WA</th>
                 <th>Tipe</th>
                 <th>Interval</th>
                 <th>Terakhir Sync</th>
@@ -107,6 +136,24 @@ export default function SuppliersPage() {
               {data.map((s: any) => (
                 <tr key={s.id}>
                   <td>{s.name}</td>
+                  <td>
+                    {editingId === s.id ? (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          value={editWa}
+                          onChange={(e) => setEditWa(e.target.value)}
+                          placeholder="08xxxxxxxxxx"
+                          style={{ width: 140 }}
+                        />
+                        <button className="btn" onClick={() => saveEditWa(s.id)}>Simpan</button>
+                        <button className="btn" style={{ background: '#a0aec0' }} onClick={() => setEditingId(null)}>Batal</button>
+                      </div>
+                    ) : (
+                      <span onClick={() => startEditWa(s)} style={{ cursor: 'pointer', color: s.whatsappNumber ? '#2d3748' : '#a0aec0' }}>
+                        {s.whatsappNumber || 'Belum diisi — klik untuk isi'}
+                      </span>
+                    )}
+                  </td>
                   <td>{s.sourceType}</td>
                   <td>{s.syncIntervalMinutes} mnt</td>
                   <td>{s.lastSyncedAt ? new Date(s.lastSyncedAt).toLocaleString('id-ID') : '-'}</td>
