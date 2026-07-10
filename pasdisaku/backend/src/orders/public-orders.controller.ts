@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Post, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface CheckoutItemDto {
@@ -49,12 +49,13 @@ export class PublicOrdersController {
     const shippingCost = Number(dto.shippingCost) || 0;
     const totalAmount = subtotalTotal + shippingCost;
     const orderNumber = `PSD-${Date.now()}`;
+    const normalizedPhone = this.normalizePhone(dto.customerPhone);
 
     const order = await this.prisma.order.create({
       data: {
         orderNumber,
         customerName: dto.customerName,
-        customerPhone: dto.customerPhone,
+        customerPhone: normalizedPhone,
         customerAddress: dto.customerAddress,
         source: 'manual',
         status: 'pending',
@@ -71,10 +72,64 @@ export class PublicOrdersController {
       });
     }
 
+    // Simpan/perbarui kontak ini ke database CRM WhatsApp secara otomatis,
+    // supaya nomor pembeli langsung siap dipakai untuk broadcast promo.
+    try {
+      await this.prisma.waContact.upsert({
+        where: { phone: normalizedPhone },
+        update: { name: dto.customerName },
+        create: { name: dto.customerName, phone: normalizedPhone },
+      });
+    } catch {
+      // Tidak kritis kalau gagal — proses checkout tetap lanjut.
+    }
+
     return {
       orderNumber: order.orderNumber,
       totalAmount: Number(order.totalAmount),
       status: order.status,
     };
+  }
+
+  /**
+   * Lacak pesanan tanpa perlu akun/login — cukup nomor pesanan + nomor HP
+   * (dicocokkan) untuk verifikasi sederhana, supaya orang lain tidak bisa
+   * asal menebak nomor pesanan orang lain.
+   */
+  @Get('track')
+  async track(@Query('orderNumber') orderNumber: string, @Query('phone') phone: string) {
+    if (!orderNumber || !phone) {
+      throw new BadRequestException('Nomor pesanan dan nomor HP wajib diisi.');
+    }
+
+    const normalizedPhone = this.normalizePhone(phone);
+
+    const order = await this.prisma.order.findUnique({
+      where: { orderNumber },
+      include: { items: { include: { product: true } } },
+    });
+
+    if (!order || order.customerPhone !== normalizedPhone) {
+      throw new NotFoundException('Pesanan tidak ditemukan. Cek kembali nomor pesanan dan nomor HP.');
+    }
+
+    return {
+      orderNumber: order.orderNumber,
+      status: order.status,
+      totalAmount: Number(order.totalAmount),
+      createdAt: order.createdAt,
+      items: order.items.map((i) => ({
+        name: i.product?.name || 'Produk',
+        quantity: i.quantity,
+        subtotal: Number(i.subtotal),
+      })),
+    };
+  }
+
+  private normalizePhone(raw: string): string {
+    let s = String(raw || '').replace(/\D/g, '');
+    if (s.startsWith('0')) s = '62' + s.slice(1);
+    if (!s.startsWith('62') && s.length > 0) s = '62' + s;
+    return s;
   }
 }
