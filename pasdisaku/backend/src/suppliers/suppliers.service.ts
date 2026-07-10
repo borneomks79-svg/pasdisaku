@@ -71,3 +71,4 @@ export class SuppliersService {
 
   async triggerSync(supplierId: string) {
     const job = await this.syncQueue.a
+  }
